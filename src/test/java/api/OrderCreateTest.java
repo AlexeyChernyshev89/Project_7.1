@@ -1,5 +1,8 @@
-package api;
+package api.tests;
 
+import api.TestBase;
+import api.models.Order;
+import api.models.OrderColor;
 import io.qameta.allure.Description;
 import io.qameta.allure.junit4.DisplayName;
 import org.junit.Test;
@@ -8,26 +11,26 @@ import org.junit.runners.Parameterized;
 
 import java.util.Arrays;
 import java.util.Collection;
+import java.util.List;
 
-import static io.restassured.RestAssured.given;
 import static org.hamcrest.Matchers.notNullValue;
 
 @RunWith(Parameterized.class)
-public class OrderTest extends TestBase {
+public class OrderCreateTest extends TestBase {
 
-    private final String[] colors;
+    private final List<String> colors;
 
-    public OrderTest(String[] colors) {
+    public OrderCreateTest(List<String> colors) {
         this.colors = colors;
     }
 
-    @Parameterized.Parameters
+    @Parameterized.Parameters(name = "Цвета: {0}")
     public static Collection<Object[]> data() {
         return Arrays.asList(new Object[][] {
-                {new String[]{"BLACK"}},           // Один цвет BLACK
-                {new String[]{"GREY"}},            // Один цвет GREY
-                {new String[]{"BLACK", "GREY"}},   // Оба цвета
-                {new String[]{}}                   // Без цвета
+                {List.of(OrderColor.BLACK.name())},           // Один цвет BLACK
+                {List.of(OrderColor.GREY.name())},            // Один цвет GREY
+                {List.of(OrderColor.BLACK.name(), OrderColor.GREY.name())}, // Оба цвета
+                {List.of()}                                    // Без цвета
         });
     }
 
@@ -35,43 +38,24 @@ public class OrderTest extends TestBase {
     @DisplayName("Создание заказа с разными цветами")
     @Description("Параметризованный тест создания заказа с разными комбинациями цветов")
     public void testCreateOrderWithDifferentColors() {
-        String requestBody;
+        Order order = new Order(
+                generateFirstName(),
+                generateLastName(),
+                generateAddress(),
+                4,  // metroStation
+                generatePhone(),
+                5,  // rentTime
+                "2024-12-31",
+                "Тестовый комментарий",
+                colors
+        );
 
-        if (colors.length == 0) {
-            // Заказ без указания цвета
-            requestBody = "{\"firstName\": \"Naruto\", " +
-                    "\"lastName\": \"Uzumaki\", " +
-                    "\"address\": \"Konoha, 142 apt.\", " +
-                    "\"metroStation\": 4, " +
-                    "\"phone\": \"+7 800 355 35 35\", " +
-                    "\"rentTime\": 5, " +
-                    "\"deliveryDate\": \"2024-12-31\", " +
-                    "\"comment\": \"Saske, come back to Konoha\"}";
-        } else {
-            // Заказ с цветами
-            String colorsJson = "\"" + String.join("\", \"", colors) + "\"";
-            requestBody = String.format("{\"firstName\": \"Naruto\", " +
-                    "\"lastName\": \"Uzumaki\", " +
-                    "\"address\": \"Konoha, 142 apt.\", " +
-                    "\"metroStation\": 4, " +
-                    "\"phone\": \"+7 800 355 35 35\", " +
-                    "\"rentTime\": 5, " +
-                    "\"deliveryDate\": \"2024-12-31\", " +
-                    "\"comment\": \"Saske, come back to Konoha\", " +
-                    "\"color\": [%s]}", colorsJson);
-        }
+        int track = orderSteps.getTrack(orderSteps.createOrder(order));
+        orderTracksToDelete.add(track);
 
-        int track = given()
-                .header("Content-type", "application/json")
-                .body(requestBody)
-                .when()
-                .post("/api/v1/orders")
+        orderSteps.createOrder(order)
                 .then()
                 .statusCode(201)
-                .body("track", notNullValue())
-                .extract()
-                .path("track");
-
-        orderIdsToDelete.add(track);
+                .body("track", notNullValue());
     }
 }
